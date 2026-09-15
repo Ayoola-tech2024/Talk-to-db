@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "talk-to-db": "./bin/talk-to-db.js",
-    "talkdb": "./bin/talk-to-db.js"
+    "talk-to-db": "bin/talk-to-db.js",
+    "talkdb": "bin/talk-to-db.js"
   },
   "files": [
     "bin/",
