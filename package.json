@@ -1,11 +1,12 @@
 {
-  "name": "@damisile_ayoola/db-lens",
+  "name": "@damisile_ayoola/talk-to-db",
   "version": "1.0.0",
-  "description": "Interactive visual database explorer, automatic ERD diagram generator, and plain-English natural language query assistant for students, analysts, and developers.",
+  "description": "Interactive visual database explorer, auto ERD diagram generator, and plain-English natural language query assistant for students, analysts, and developers.",
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "db-lens": "./bin/db-lens.js"
+    "talk-to-db": "./bin/talk-to-db.js",
+    "talkdb": "./bin/talk-to-db.js"
   },
   "files": [
     "bin/",
@@ -16,9 +17,9 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "start": "node bin/db-lens.js --demo",
-    "dev": "node bin/db-lens.js --demo",
-    "test": "node --test test/test-dblens.js"
+    "start": "node bin/talk-to-db.js --demo",
+    "dev": "node bin/talk-to-db.js --demo",
+    "test": "node --test test/test-talktodb.js"
   },
   "keywords": [
     "database",
@@ -37,11 +38,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Ayoola-tech2024/db-lens.git"
+    "url": "git+https://github.com/Ayoola-tech2024/Talk-to-db.git"
   },
-  "homepage": "https://github.com/Ayoola-tech2024/db-lens#readme",
+  "homepage": "https://github.com/Ayoola-tech2024/Talk-to-db#readme",
   "bugs": {
-    "url": "https://github.com/Ayoola-tech2024/db-lens/issues"
+    "url": "https://github.com/Ayoola-tech2024/Talk-to-db/issues"
   },
   "engines": {
     "node": ">=18.0.0"

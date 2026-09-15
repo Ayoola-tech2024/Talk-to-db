@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">🔍 db-lens</h1>
+  <h1 align="center">🗣️ TalkToDB</h1>
   <p align="center">
     <strong>Interactive Visual Database Explorer & Plain-English SQL Query Assistant</strong><br>
     <em>Empowering students, business analysts, and developers to explore, query, and visualize databases without writing raw SQL</em>
@@ -7,7 +7,7 @@
   <p align="center">
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
     <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg" alt="Node: >=18.0.0"></a>
-    <a href="https://www.npmjs.com/package/@damisile_ayoola/db-lens"><img src="https://img.shields.io/npm/v/@damisile_ayoola/db-lens.svg?color=cb3837" alt="npm version"></a>
+    <a href="https://www.npmjs.com/package/@damisile_ayoola/talk-to-db"><img src="https://img.shields.io/npm/v/@damisile_ayoola/talk-to-db.svg?color=cb3837" alt="npm version"></a>
   </p>
 </p>
 
@@ -17,7 +17,7 @@
 
 Students studying Business Information Technology, business analysts, product managers, and non-technical founders frequently need to analyze data in SQL databases. However, raw SQL syntax (`JOIN`, `GROUP BY`, `HAVING`, foreign keys) is intimidating, and traditional database management tools are cluttered and enterprise-heavy.
 
-**db-lens solves this by letting anyone explore databases visually and query in plain English.**
+**TalkToDB solves this by letting anyone explore databases visually and query in plain English.**
 
 ---
 
@@ -40,7 +40,7 @@ Students studying Business Information Technology, business analysts, product ma
 ### 1. Launch with Demo Datasets in Browser
 
 ```bash
-npx @damisile_ayoola/db-lens --demo
+npx @damisile_ayoola/talk-to-db --demo
 ```
 Open `http://localhost:4300` to interactively explore the University or E-Commerce database.
 
@@ -49,7 +49,7 @@ Open `http://localhost:4300` to interactively explore the University or E-Commer
 ### 2. Open Your Own SQLite Database
 
 ```bash
-npx @damisile_ayoola/db-lens ./my_database.sqlite
+npx @damisile_ayoola/talk-to-db ./my_database.sqlite
 ```
 
 ---

@@ -10,7 +10,7 @@ import { createDbLensApp } from '../src/server.js';
 const program = new Command();
 
 program
-  .name('db-lens')
+  .name('talk-to-db')
   .description('Interactive visual database explorer, auto ERD diagram generator, and plain-English natural language query assistant.')
   .version('1.0.0')
   .argument('[dbFile]', 'Path to SQLite database file (.sqlite, .db, or .sql)', null)
@@ -55,9 +55,9 @@ async function start() {
   });
 
   const shutdown = () => {
-    console.log(pc.yellow('\n  Shutting down db-lens...'));
+    console.log(pc.yellow('\n  Shutting down TalkToDB...'));
     server.close(() => {
-      console.log(pc.green('  db-lens stopped. Have a productive day! 🚀\n'));
+      console.log(pc.green('  TalkToDB stopped. Have a productive day! 🚀\n'));
       process.exit(0);
     });
   };
@@ -68,12 +68,12 @@ async function start() {
 
 function printBanner({ port, dbPath, defaultDataset }) {
   console.log(pc.cyan(`
-  ██████╗ ██████╗       ██╗     ███████╗███╗   ██╗███████╗
-  ██╔══██╗██╔══██╗      ██║     ██╔════╝████╗  ██║██╔════╝
-  ██║  ██║██████╔╝█████╗██║     █████╗  ██╔██╗ ██║███████╗
-  ██║  ██║██╔══██╗╚════╝██║     ██╔══╝  ██║╚██╗██║╚════██║
-  ██████╔╝██████╔╝      ███████╗███████╗██║ ╚████║███████║
-  ╚═════╝ ╚═════╝       ╚══════╝╚══════╝╚═╝  ╚═══╝╚══════╝
+  ████████╗ █████╗ ██╗     ██╗  ██╗████████╗ ██████╗       ██████╗ ██████╗ 
+  ╚══██╔══╝██╔══██╗██║     ██║ ██╔╝╚══██╔══╝██╔═══██╗      ██╔══██╗██╔══██╗
+     ██║   ███████║██║     █████╔╝    ██║   ██║   ██║█████╗██║  ██║██████╔╝
+     ██║   ██╔══██║██║     ██╔═██╗    ██║   ██║   ██║╚════╝██║  ██║██╔══██╗
+     ██║   ██║  ██║███████╗██║  ██╗   ██║   ╚██████╔╝      ██████╔╝██████╔╝
+     ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝       ╚═════╝ ╚═════╝ 
   `));
   console.log(pc.dim('  Visual Database Explorer & Plain-English SQL Query Assistant'));
   console.log(pc.dim('  ----------------------------------------------------------------'));

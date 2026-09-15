@@ -12,7 +12,7 @@ import { createDbLensApp } from '../src/server.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-test('db-lens — Complete E2E Database Exploration & Natural Language Suite', async (t) => {
+test('TalkToDB — Complete E2E Database Exploration & Natural Language Suite', async (t) => {
 
   let adapter;
   let schema;
