@@ -7,12 +7,13 @@ import { SqliteAdapter } from '../src/engine/sqlite-adapter.js';
 import { SchemaExtractor } from '../src/engine/schema-extractor.js';
 import { NlToSqlEngine } from '../src/engine/nl-to-sql.js';
 import { TableStatistics } from '../src/engine/statistics.js';
+import { AiEngine } from '../src/engine/ai-engine.js';
 import { createDbLensApp } from '../src/server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-test('TalkToDB — Complete E2E Database Exploration & Natural Language Suite', async (t) => {
+test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suite', async (t) => {
 
   let adapter;
   let schema;
@@ -45,7 +46,6 @@ test('TalkToDB — Complete E2E Database Exploration & Natural Language Suite', 
     const pkCol = studentsTable.columns.find(c => c.isPrimaryKey);
     assert.equal(pkCol.name, 'student_id');
 
-    // Verify foreign key connection
     const studentDeptRel = schema.relations.find(r => r.fromTable === 'students' && r.toTable === 'departments');
     assert.ok(studentDeptRel);
     assert.equal(studentDeptRel.fromColumn, 'dept_id');
@@ -86,7 +86,21 @@ test('TalkToDB — Complete E2E Database Exploration & Natural Language Suite', 
     assert.ok(res4.sql.includes('JOIN departments ON students.dept_id = departments.dept_id'));
   });
 
-  await t.test('5. Live Studio Express Server Endpoints', async () => {
+  await t.test('5. AI Engine Schema Formatting & Fallback Protection', () => {
+    const aiEngine = new AiEngine();
+    assert.equal(aiEngine.hasApiKey(), false);
+
+    const formatted = aiEngine.formatSchemaPrompt(schema);
+    assert.ok(formatted.includes('Table: "students"'));
+    assert.ok(formatted.includes('Table: "departments"'));
+    assert.ok(formatted.includes('Foreign Key Relationships'));
+
+    aiEngine.setCredentials({ apiKey: 'test_gemini_key_12345678', provider: 'gemini' });
+    assert.equal(aiEngine.hasApiKey(), true);
+    assert.equal(aiEngine.provider, 'gemini');
+  });
+
+  await t.test('6. Live Studio Express Server Endpoints & AI Config', async () => {
     const app = createDbLensApp({ port: 4350, defaultDataset: 'university' });
     const server = http.createServer(app);
 
@@ -99,11 +113,21 @@ test('TalkToDB — Complete E2E Database Exploration & Natural Language Suite', 
       const schemaData = await schemaRes.json();
       assert.equal(schemaData.tableCount, 5);
 
-      // 2. Test /api/ask with natural prompt
+      // 2. Test /api/ai/config & /api/ai/status
+      const aiConfigRes = await fetch('http://localhost:4350/api/ai/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: 'mock_key_9999', provider: 'gemini' })
+      });
+      assert.equal(aiConfigRes.status, 200);
+      const aiStatus = await aiConfigRes.json();
+      assert.equal(aiStatus.hasApiKey, true);
+
+      // 3. Test /api/ask with natural prompt (fallback heuristic gracefully if mock key)
       const askRes = await fetch('http://localhost:4350/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'Top 2 students with highest GPA' })
+        body: JSON.stringify({ prompt: 'Top 2 students with highest GPA', useAi: false })
       });
       assert.equal(askRes.status, 200);
       const askData = await askRes.json();
@@ -111,8 +135,9 @@ test('TalkToDB — Complete E2E Database Exploration & Natural Language Suite', 
       assert.equal(askData.rowCount, 2);
       assert.equal(askData.rows[0].full_name, 'Ayoola Damisile');
       assert.equal(askData.rows[0].gpa, 4.88);
+      assert.ok(askData.executiveSummary);
 
-      // 3. Test /api/dataset/load to switch to ecommerce
+      // 4. Test /api/dataset/load to switch to ecommerce
       const swapRes = await fetch('http://localhost:4350/api/dataset/load', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

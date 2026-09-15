@@ -35,7 +35,7 @@
           TALK-TO-DB
         </span>
       </div>
-      <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700">v1.0.0</span>
+      <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700">v1.1.0</span>
       <div class="hidden sm:flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-800/50">
         <span>🗄️</span>
         <span id="activeDatasetLabel">University Database</span>
@@ -57,6 +57,10 @@
 
     <!-- Header Actions -->
     <div class="flex items-center gap-2">
+      <button id="openAiModalBtn" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 transition-all cursor-pointer">
+        <span id="aiStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+        <span>🔑 AI Settings</span>
+      </button>
       <select id="datasetSwitcher" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer">
         <option value="university">🎓 University Student DB</option>
         <option value="ecommerce">🛍️ E-Commerce & Solar DB</option>
@@ -81,9 +85,7 @@
       <svg id="erdSvgCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-0"></svg>
 
       <!-- Tables Container -->
-      <div id="erdTablesContainer" class="absolute inset-0 overflow-auto p-8 custom-scroll">
-        <!-- Tables are dynamically injected here -->
-      </div>
+      <div id="erdTablesContainer" class="absolute inset-0 overflow-auto p-8 custom-scroll"></div>
     </section>
 
     <!-- 2. TAB: Plain English Query Assistant -->
@@ -92,14 +94,17 @@
       <!-- Top Query Input Header -->
       <div class="p-4 border-b border-slate-800 bg-slate-900/40 flex flex-col gap-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-            <span>✨</span> Ask Questions in Plain English (No SQL Required)
-          </h3>
+          <div class="flex items-center gap-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <span>✨</span> Ask Questions in Plain English (No SQL Required)
+            </h3>
+            <span id="activeModeBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">⚡ Local Heuristic Mode</span>
+          </div>
           <span class="text-xs text-slate-500">Auto-converts to SQL with step-by-step logic explanation</span>
         </div>
 
         <div class="flex gap-2">
-          <input type="text" id="nlPromptInput" placeholder="e.g., Show me the top 5 students with highest GPA, or How many courses are in Business Information Technology?"
+          <input type="text" id="nlPromptInput" placeholder="e.g., Show me the top 5 students with highest GPA, or courses in Business Information Technology"
             class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500">
           <button id="askNlBtn" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer">
             🚀 Run Query
@@ -119,7 +124,7 @@
             Instructors with salary above 1300000
           </button>
           <button class="prompt-chip bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors cursor-pointer">
-            Students enrolled in Solar Energy
+            List students with their department
           </button>
         </div>
       </div>
@@ -138,16 +143,28 @@
           </div>
 
           <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-1.5 text-xs text-slate-300">
-            <span class="font-bold text-slate-200">💡 Plain English Explanation</span>
+            <span class="font-bold text-slate-200">💡 Step-by-Step Logic Explanation</span>
             <div id="queryExplanationBox" class="leading-relaxed text-slate-400">
               Selects the first 10 students from the database.
             </div>
           </div>
         </div>
 
-        <!-- Right Result Side: Data Table -->
-        <div class="flex-1 flex flex-col overflow-hidden p-4">
-          <div class="flex items-center justify-between text-xs mb-2">
+        <!-- Right Result Side: Executive Story & Data Table -->
+        <div class="flex-1 flex flex-col overflow-hidden p-4 gap-3">
+          
+          <!-- Executive Storytelling Answer Banner -->
+          <div id="executiveStoryBox" class="bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-slate-900 border border-emerald-800/40 p-3.5 rounded-xl flex items-start gap-3 shrink-0">
+            <span class="text-xl">🤖</span>
+            <div class="flex-1">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Executive Takeaway</span>
+              <p id="executiveStoryText" class="text-xs text-slate-200 mt-0.5 leading-relaxed font-medium">
+                Retrieved 6 student records. Ayoola Damisile leads with the highest GPA of 4.88 in Business Information Technology.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs">
             <div class="flex items-center gap-2">
               <span id="queryRowCountBadge" class="font-bold text-slate-300">0 rows found</span>
               <span id="queryDurationBadge" class="text-slate-500 font-mono">(0ms)</span>
@@ -192,9 +209,7 @@
         </div>
 
         <!-- Table Quality Stats Cards -->
-        <div id="tableStatsGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-          <!-- Dynamic quality stat cards -->
-        </div>
+        <div id="tableStatsGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0"></div>
 
         <!-- Table Data Preview -->
         <div class="flex-1 flex flex-col bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
@@ -214,6 +229,50 @@
     </section>
 
   </main>
+
+  <!-- AI Settings Modal -->
+  <div id="aiModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md flex flex-col overflow-hidden shadow-2xl">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-semibold text-sm text-slate-100 flex items-center gap-2">
+          <span>🤖</span> AI Engine Settings
+        </h3>
+        <button id="closeAiModalBtn" class="text-slate-400 hover:text-white text-sm cursor-pointer">✕</button>
+      </div>
+
+      <div class="p-5 flex flex-col gap-4">
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Connect your <strong>Google Gemini API Key</strong> (or OpenAI / Groq key) to unlock complex multi-table joins, self-healing SQL, and executive takeaways.
+        </p>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-400 font-medium">Provider:</label>
+          <select id="aiProviderSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer">
+            <option value="gemini">Google Gemini (Free & Recommended)</option>
+            <option value="openai">OpenAI (GPT-4o)</option>
+            <option value="groq">Groq (Ultra-fast Llama 3.3)</option>
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-400 font-medium">API Key:</label>
+          <input type="password" id="aiApiKeyInput" placeholder="Paste your API key here..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div class="text-[11px] text-slate-500 italic">
+          💡 Tip: Free Google Gemini keys can be generated at <a href="https://aistudio.google.com" target="_blank" class="text-emerald-400 underline">aistudio.google.com</a>.
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2">
+        <button id="cancelAiModalBtn" class="px-4 py-1.5 text-xs font-medium text-slate-400 hover:text-white cursor-pointer">Cancel</button>
+        <button id="saveAiSettingsBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors cursor-pointer">
+          💾 Save & Activate AI
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script src="/studio.js"></script>
 </body>

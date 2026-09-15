@@ -25,13 +25,14 @@ Students studying Business Information Technology, business analysts, product ma
 
 | Feature | Description |
 |---------|-------------|
+| **🤖 AI Engine (Gemini / OpenAI / Groq)** | Converts complex questions into multi-table SQL joins, window functions, and subqueries |
+| **🩹 Self-Healing SQL Loop** | If SQLite returns a syntax or schema error, AI inspects the error and auto-corrects the query |
+| **💡 Executive Data Takeaways** | Synthesizes a 2-sentence human summary answering the core business question directly |
+| **⚡ Dual-Mode (Online & Offline)** | Works instantly offline with zero config, or supercharge with a free Google Gemini key |
 | **🕸️ Auto ERD Diagram** | Automatically maps tables, columns, primary keys (🔑), and foreign key connection lines (🔗) |
-| **💬 Plain English SQL Assistant** | Type questions in natural English (e.g., *"Top 5 students with highest GPA"*) → instant SQL + result table |
-| **💡 Step-by-Step Logic Explanation** | Explains exactly how and why each generated SQL query works in simple words |
 | **📊 Instant Table Quality Metrics** | Row counts, column data types, missing/null value percentages, and completeness scores |
 | **📥 1-Click CSV Export** | Export any query or table preview to CSV with a single click |
 | **🎓 Built-in Educational Datasets** | Pre-loaded with **University Student Portal** and **Solar E-Commerce** databases |
-| **⚡ Zero Heavy Dependencies** | Powered by Node.js built-in `DatabaseSync` engine — zero native build issues |
 
 ---
 

@@ -1,7 +1,8 @@
-// db-lens Interactive Studio Client
+// TalkToDB Interactive Studio Client
 let schemaData = { tables: [], relations: [] };
 let selectedTableName = null;
 let currentQueryRows = [];
+let isAiActive = false;
 
 // DOM Elements
 const activeDatasetLabel = document.getElementById('activeDatasetLabel');
@@ -11,10 +12,21 @@ const erdRelationCount = document.getElementById('erdRelationCount');
 const erdSvgCanvas = document.getElementById('erdSvgCanvas');
 const erdTablesContainer = document.getElementById('erdTablesContainer');
 
+const openAiModalBtn = document.getElementById('openAiModalBtn');
+const aiStatusDot = document.getElementById('aiStatusDot');
+const aiModal = document.getElementById('aiModal');
+const closeAiModalBtn = document.getElementById('closeAiModalBtn');
+const cancelAiModalBtn = document.getElementById('cancelAiModalBtn');
+const saveAiSettingsBtn = document.getElementById('saveAiSettingsBtn');
+const aiProviderSelect = document.getElementById('aiProviderSelect');
+const aiApiKeyInput = document.getElementById('aiApiKeyInput');
+const activeModeBadge = document.getElementById('activeModeBadge');
+
 const nlPromptInput = document.getElementById('nlPromptInput');
 const askNlBtn = document.getElementById('askNlBtn');
 const generatedSqlViewer = document.getElementById('generatedSqlViewer');
 const queryExplanationBox = document.getElementById('queryExplanationBox');
+const executiveStoryText = document.getElementById('executiveStoryText');
 const queryRowCountBadge = document.getElementById('queryRowCountBadge');
 const queryDurationBadge = document.getElementById('queryDurationBadge');
 const queryTableHead = document.getElementById('queryTableHead');
@@ -32,9 +44,10 @@ const previewTableBody = document.getElementById('previewTableBody');
 // Initialize Studio
 async function init() {
   setupEventListeners();
+  await checkAiStatus();
   await loadSchema();
   // Run default query
-  executeNlQuery('Show all students with their GPA');
+  executeNlQuery('Top 5 students with highest GPA');
 }
 
 // Setup Event Listeners
@@ -64,6 +77,37 @@ function setupEventListeners() {
         }
       }
     });
+  });
+
+  // AI Modal Controls
+  openAiModalBtn.addEventListener('click', () => aiModal.classList.remove('hidden'));
+  closeAiModalBtn.addEventListener('click', () => aiModal.classList.add('hidden'));
+  cancelAiModalBtn.addEventListener('click', () => aiModal.classList.add('hidden'));
+
+  saveAiSettingsBtn.addEventListener('click', async () => {
+    const apiKey = aiApiKeyInput.value.trim();
+    const provider = aiProviderSelect.value;
+    saveAiSettingsBtn.disabled = true;
+    saveAiSettingsBtn.innerText = 'Saving...';
+
+    try {
+      const res = await fetch('/api/ai/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, provider })
+      });
+      const data = await res.json();
+      aiModal.classList.add('hidden');
+      await checkAiStatus();
+      if (data.hasApiKey) {
+        alert(`AI Engine activated with ${provider.toUpperCase()}! Try asking a complex query now.`);
+      }
+    } catch (err) {
+      alert('Failed to save AI config: ' + err.message);
+    } finally {
+      saveAiSettingsBtn.disabled = false;
+      saveAiSettingsBtn.innerText = '💾 Save & Activate AI';
+    }
   });
 
   // Dataset Switcher
@@ -115,6 +159,27 @@ function setupEventListeners() {
 
   // Export CSV Button
   exportCsvBtn.addEventListener('click', exportTableToCsv);
+}
+
+// Check AI Status
+async function checkAiStatus() {
+  try {
+    const res = await fetch('/api/ai/status');
+    const data = await res.json();
+    isAiActive = data.hasApiKey;
+
+    if (isAiActive) {
+      aiStatusDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+      activeModeBadge.innerText = `🤖 AI Active (${data.provider})`;
+      activeModeBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50';
+    } else {
+      aiStatusDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+      activeModeBadge.innerText = '⚡ Local Heuristic Mode';
+      activeModeBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+    }
+  } catch {
+    aiStatusDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+  }
 }
 
 // Load Schema
@@ -171,7 +236,6 @@ function renderErdDiagram() {
     `;
 
     card.addEventListener('click', () => {
-      // Switch to Table profiler
       document.querySelector('.nav-tab[data-tab="table"]').click();
       selectTableForProfile(table.name);
     });
@@ -179,7 +243,6 @@ function renderErdDiagram() {
     erdTablesContainer.appendChild(card);
   });
 
-  // Render SVG foreign key connection bezier curves
   drawRelationshipCurves(tablePositions);
 }
 
@@ -192,9 +255,9 @@ function drawRelationshipCurves(positions) {
     const toPos = positions[rel.toTable];
 
     if (fromPos && toPos) {
-      const startX = fromPos.x + 260; // Right side of from table
+      const startX = fromPos.x + 260;
       const startY = fromPos.y + 35;
-      const endX = toPos.x;          // Left side of to table
+      const endX = toPos.x;
       const endY = toPos.y + 35;
 
       const controlX1 = startX + 50;
@@ -218,13 +281,13 @@ function drawRelationshipCurves(positions) {
 // Execute Natural Language Query
 async function executeNlQuery(prompt) {
   askNlBtn.disabled = true;
-  askNlBtn.innerText = 'Thinking...';
+  askNlBtn.innerText = 'Analyzing...';
 
   try {
     const res = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, useAi: true })
     });
 
     const data = await res.json();
@@ -234,13 +297,16 @@ async function executeNlQuery(prompt) {
       .replace(/`([^`]+)`/g, '<code class="text-emerald-400 bg-slate-900 px-1 rounded font-mono text-[11px]">$1</code>')
       .replace(/\n/g, '<br>');
 
+    executiveStoryText.innerHTML = (data.executiveSummary || 'Query executed successfully.')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-emerald-300 font-bold">$1</strong>');
+
     queryRowCountBadge.innerText = `${data.rowCount || 0} row${data.rowCount === 1 ? '' : 's'} found`;
-    queryDurationBadge.innerText = `(${data.durationMs || 0}ms)`;
+    queryDurationBadge.innerText = `(${data.durationMs || 0}ms - ${data.mode || 'local'})`;
 
     currentQueryRows = data.rows || [];
     renderDataTable(currentQueryRows, queryTableHead, queryTableBody);
   } catch (err) {
-    console.error('Failed to execute NL query:', err);
+    console.error('Failed to execute query:', err);
   } finally {
     askNlBtn.disabled = false;
     askNlBtn.innerText = '🚀 Run Query';
@@ -294,13 +360,11 @@ async function selectTableForProfile(tableName) {
   const tableObj = schemaData.tables.find(t => t.name === tableName);
   currentSelectedTableRowCount.innerText = `${tableObj ? tableObj.rowCount : 0} rows`;
 
-  // Fetch stats & rows
   const [statsRes, rowsRes] = await Promise.all([
     fetch(`/api/table/${tableName}/stats`).then(r => r.json()),
     fetch(`/api/table/${tableName}/rows?limit=50`).then(r => r.json())
   ]);
 
-  // Render quality metric cards
   const totalCols = statsRes.columns ? statsRes.columns.length : 0;
   const zeroNullCols = (statsRes.columns || []).filter(c => c.nullCount === 0).length;
   const dataQualityScore = totalCols > 0 ? Math.round((zeroNullCols / totalCols) * 100) : 100;
@@ -326,7 +390,6 @@ async function selectTableForProfile(tableName) {
     </div>
   `;
 
-  // Render preview table rows
   renderDataTable(rowsRes.rows || [], previewTableHead, previewTableBody);
 }
 

@@ -5,6 +5,7 @@ import { SqliteAdapter } from './engine/sqlite-adapter.js';
 import { SchemaExtractor } from './engine/schema-extractor.js';
 import { NlToSqlEngine } from './engine/nl-to-sql.js';
 import { TableStatistics } from './engine/statistics.js';
+import { AiEngine } from './engine/ai-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +30,7 @@ export function createDbLensApp(config = {}) {
   let cachedSchema = schemaExtractor.extractSchema();
   let nlEngine = new NlToSqlEngine(cachedSchema);
   let statisticsEngine = new TableStatistics(adapter);
+  let aiEngine = new AiEngine();
 
   app.use(express.json());
 
@@ -45,7 +47,28 @@ export function createDbLensApp(config = {}) {
     res.json(cachedSchema);
   });
 
-  // 2. Execute raw SQL query
+  // 2. Configure AI Engine Credentials
+  app.post('/api/ai/config', (req, res) => {
+    const { apiKey, provider = 'gemini', model = null } = req.body || {};
+    aiEngine.setCredentials({ apiKey, provider, model });
+    res.json({
+      success: true,
+      hasApiKey: aiEngine.hasApiKey(),
+      provider: aiEngine.provider,
+      model: aiEngine.model
+    });
+  });
+
+  // 3. Get AI Status
+  app.get('/api/ai/status', (req, res) => {
+    res.json({
+      hasApiKey: aiEngine.hasApiKey(),
+      provider: aiEngine.provider,
+      model: aiEngine.model
+    });
+  });
+
+  // 4. Execute raw SQL query
   app.post('/api/query', (req, res) => {
     const { sql } = req.body || {};
     if (!sql) {
@@ -74,41 +97,93 @@ export function createDbLensApp(config = {}) {
     }
   });
 
-  // 3. Ask a question in plain English (Natural Language to SQL)
-  app.post('/api/ask', (req, res) => {
-    const { prompt } = req.body || {};
+  // 5. Ask a question in plain English (Dual-Mode: AI or Built-in Heuristic)
+  app.post('/api/ask', async (req, res) => {
+    const { prompt, useAi = true } = req.body || {};
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
-    const translation = nlEngine.translate(prompt);
     const startTime = Date.now();
+    let translation = null;
+    let modeUsed = 'heuristic';
+
+    // 1. Attempt AI synthesis if configured and requested
+    if (useAi && aiEngine.hasApiKey()) {
+      try {
+        translation = await aiEngine.generateQuery({
+          prompt,
+          schema: cachedSchema
+        });
+        modeUsed = `ai (${aiEngine.provider})`;
+      } catch (aiErr) {
+        console.warn('AI query generation failed, falling back to heuristic engine:', aiErr.message);
+      }
+    }
+
+    // 2. Fallback to built-in heuristic translator if AI not available
+    if (!translation) {
+      translation = nlEngine.translate(prompt);
+      modeUsed = 'local heuristic';
+    }
+
+    // 3. Execute SQL with Self-Healing Loop if AI is available
+    let rows = [];
+    let queryError = null;
 
     try {
-      const rows = adapter.query(translation.sql);
-      const durationMs = Date.now() - startTime;
-      res.json({
-        success: true,
-        prompt,
-        sql: translation.sql,
-        explanation: translation.explanation,
-        primaryTable: translation.primaryTable,
-        rowCount: rows.length,
-        durationMs,
-        rows
-      });
-    } catch (err) {
-      const durationMs = Date.now() - startTime;
-      res.json({
+      rows = adapter.query(translation.sql);
+    } catch (execErr) {
+      queryError = execErr.message;
+
+      // Self-Healing Loop with AI if active
+      if (modeUsed.startsWith('ai') && aiEngine.hasApiKey()) {
+        try {
+          const healed = await aiEngine.generateQuery({
+            prompt,
+            schema: cachedSchema,
+            errorContext: { sql: translation.sql, error: queryError }
+          });
+          rows = adapter.query(healed.sql);
+          translation = healed;
+          queryError = null;
+          modeUsed += ' (auto-healed)';
+        } catch (healErr) {
+          queryError = healErr.message;
+        }
+      }
+    }
+
+    const durationMs = Date.now() - startTime;
+
+    if (queryError) {
+      return res.json({
         success: false,
         prompt,
         sql: translation.sql,
         explanation: translation.explanation,
-        error: err.message,
+        executiveSummary: 'Unable to execute query due to syntax/schema mismatch.',
+        error: queryError,
         durationMs,
+        mode: modeUsed,
         rows: []
       });
     }
+
+    res.json({
+      success: true,
+      prompt,
+      sql: translation.sql,
+      explanation: translation.explanation,
+      executiveSummary: translation.executiveSummary || `Retrieved ${rows.length} records matching your query.`,
+      recommendedChart: translation.recommendedChart || 'table',
+      chartConfig: translation.chartConfig || null,
+      primaryTable: translation.primaryTable || null,
+      rowCount: rows.length,
+      durationMs,
+      mode: modeUsed,
+      rows
+    });
   });
 
   // 4. Get table preview rows
