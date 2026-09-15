@@ -30,19 +30,34 @@ code, pre, .font-mono {
 /* ERD Table Node Card */
 .erd-table-card {
   position: absolute;
-  width: 260px;
+  width: 270px;
   background-color: #0f172a;
   border: 1px solid #1e293b;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 14px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+  user-select: none;
   z-index: 5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.erd-table-card.dragging {
+  z-index: 50;
+  border-color: #10b981;
+  box-shadow: 0 20px 35px -5px rgba(16, 185, 129, 0.35);
+  cursor: grabbing !important;
+}
+
+.erd-table-header {
+  cursor: grab;
+  touch-action: none;
+}
+
+.erd-table-header:active {
+  cursor: grabbing;
 }
 
 .erd-table-card:hover {
   border-color: #10b981;
-  box-shadow: 0 15px 30px -5px rgba(16, 185, 129, 0.2);
-  transform: translateY(-2px);
 }
 
 .erd-column-row {
@@ -62,16 +77,16 @@ code, pre, .font-mono {
 /* SVG Connection Lines */
 .erd-relation-line {
   stroke: #06b6d4;
-  stroke-width: 2;
+  stroke-width: 2.5;
   fill: none;
   stroke-dasharray: 4, 4;
-  opacity: 0.75;
-  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+  opacity: 0.85;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
 }
 
 .erd-relation-line:hover {
   stroke: #10b981;
-  stroke-width: 3;
+  stroke-width: 4;
   stroke-dasharray: none;
   opacity: 1;
 }

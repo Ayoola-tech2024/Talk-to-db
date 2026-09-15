@@ -197,20 +197,25 @@ async function loadSchema() {
 }
 
 // Render Interactive ERD Diagram
+let activeTablePositions = {};
+
 function renderErdDiagram() {
   erdTablesContainer.innerHTML = '';
   erdSvgCanvas.innerHTML = '';
 
-  const tablePositions = {};
+  activeTablePositions = {};
 
-  schemaData.tables.forEach(table => {
-    tablePositions[table.name] = table.position;
+  schemaData.tables.forEach((table, index) => {
+    // Retain previous dragged position if exists, otherwise initial grid position
+    const posX = activeTablePositions[table.name]?.x ?? table.position.x;
+    const posY = activeTablePositions[table.name]?.y ?? table.position.y;
+    activeTablePositions[table.name] = { x: posX, y: posY };
 
     const card = document.createElement('div');
     card.id = `erd-node-${table.name}`;
-    card.className = 'erd-table-card cursor-pointer';
-    card.style.left = `${table.position.x}px`;
-    card.style.top = `${table.position.y}px`;
+    card.className = 'erd-table-card';
+    card.style.left = `${posX}px`;
+    card.style.top = `${posY}px`;
 
     const colsHtml = table.columns.map(col => `
       <div class="erd-column-row hover:bg-slate-800/60">
@@ -223,27 +228,88 @@ function renderErdDiagram() {
     `).join('');
 
     card.innerHTML = `
-      <div class="p-3 border-b border-slate-800 bg-slate-900/90 rounded-t-xl flex items-center justify-between">
-        <div class="flex items-center gap-2">
+      <div class="erd-table-header p-3 border-b border-slate-800 bg-slate-900/95 rounded-t-xl flex items-center justify-between">
+        <div class="flex items-center gap-2 pointer-events-none">
           <span class="text-xs">🗃️</span>
           <span class="font-bold text-xs text-slate-100">${table.name}</span>
         </div>
-        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">${table.rowCount} rows</span>
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 pointer-events-none">${table.rowCount} rows</span>
       </div>
       <div class="max-h-60 overflow-y-auto custom-scroll">
         ${colsHtml}
       </div>
+      <div class="p-2 border-t border-slate-800/60 bg-slate-950/40 rounded-b-xl flex justify-end">
+        <button class="view-table-btn text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 cursor-pointer">
+          Inspect Data ➔
+        </button>
+      </div>
     `;
 
-    card.addEventListener('click', () => {
+    // View Table Button handler
+    card.querySelector('.view-table-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
       document.querySelector('.nav-tab[data-tab="table"]').click();
       selectTableForProfile(table.name);
     });
 
+    // Make table draggable
+    makeTableCardDraggable(card, table.name);
+
     erdTablesContainer.appendChild(card);
   });
 
-  drawRelationshipCurves(tablePositions);
+  drawRelationshipCurves(activeTablePositions);
+}
+
+// Drag and drop handler for ERD table cards
+function makeTableCardDraggable(card, tableName) {
+  const header = card.querySelector('.erd-table-header');
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let initialLeft = 0;
+  let initialTop = 0;
+
+  function onMouseDown(e) {
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    isDragging = true;
+    card.classList.add('dragging');
+
+    startX = e.clientX;
+    startY = e.clientY;
+    initialLeft = parseInt(card.style.left, 10) || 0;
+    initialTop = parseInt(card.style.top, 10) || 0;
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    e.preventDefault();
+  }
+
+  function onMouseMove(e) {
+    if (!isDragging) return;
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    const newLeft = Math.max(10, initialLeft + dx);
+    const newTop = Math.max(10, initialTop + dy);
+
+    card.style.left = `${newLeft}px`;
+    card.style.top = `${newTop}px`;
+
+    activeTablePositions[tableName] = { x: newLeft, y: newTop };
+    drawRelationshipCurves(activeTablePositions);
+  }
+
+  function onMouseUp() {
+    if (!isDragging) return;
+    isDragging = false;
+    card.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }
+
+  header.addEventListener('mousedown', onMouseDown);
 }
 
 // Draw Bezier Curves between foreign key connected tables
@@ -255,14 +321,24 @@ function drawRelationshipCurves(positions) {
     const toPos = positions[rel.toTable];
 
     if (fromPos && toPos) {
-      const startX = fromPos.x + 260;
-      const startY = fromPos.y + 35;
-      const endX = toPos.x;
-      const endY = toPos.y + 35;
+      const cardWidth = 270;
+      
+      // Calculate dynamic anchor points depending on relative table position
+      let startX = fromPos.x + cardWidth;
+      let startY = fromPos.y + 40;
+      let endX = toPos.x;
+      let endY = toPos.y + 40;
 
-      const controlX1 = startX + 50;
+      // If fromTable is to the right of toTable, connect from left to right
+      if (fromPos.x > toPos.x + cardWidth) {
+        startX = fromPos.x;
+        endX = toPos.x + cardWidth;
+      }
+
+      const dx = Math.abs(endX - startX) * 0.5;
+      const controlX1 = startX < endX ? startX + dx : startX - dx;
       const controlY1 = startY;
-      const controlX2 = endX - 50;
+      const controlX2 = startX < endX ? endX - dx : endX + dx;
       const controlY2 = endY;
 
       const d = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
