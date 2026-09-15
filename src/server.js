@@ -81,10 +81,8 @@ export async function createDbLensApp(config = {}) {
     }
 
     const tableNames = await adapter.getTableNames();
-    let totalRows = 0;
-    for (const t of tableNames) {
-      totalRows += await adapter.getTableRowCount(t);
-    }
+    const counts = await Promise.all(tableNames.map(t => adapter.getTableRowCount(t)));
+    const totalRows = counts.reduce((sum, c) => sum + c, 0);
 
     res.json({
       dbName,
