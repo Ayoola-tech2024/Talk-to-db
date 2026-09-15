@@ -7,6 +7,7 @@ import { SchemaExtractor } from './engine/schema-extractor.js';
 import { NlToSqlEngine } from './engine/nl-to-sql.js';
 import { TableStatistics } from './engine/statistics.js';
 import { AiEngine } from './engine/ai-engine.js';
+import { MockSeeder } from './engine/mock-seeder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,6 +47,59 @@ export function createDbLensApp(config = {}) {
   app.use(express.static(publicDir));
 
   // --- REST APIs ---
+
+  // 0. Get Active Database Info
+  app.get('/api/info', (req, res) => {
+    let dbName = 'University Student DB';
+    let isCustom = false;
+    if (customSqlFile) {
+      dbName = path.basename(customSqlFile);
+      isCustom = true;
+    } else if (dbPath !== ':memory:') {
+      dbName = path.basename(dbPath);
+      isCustom = true;
+    } else if (defaultDataset) {
+      dbName = defaultDataset === 'ecommerce' ? 'Solar E-Commerce DB' : 'University Student DB';
+    }
+
+    const tableNames = adapter.getTableNames();
+    let totalRows = 0;
+    for (const t of tableNames) {
+      totalRows += adapter.getTableRowCount(t);
+    }
+
+    res.json({
+      dbName,
+      isCustom,
+      sourcePath: customSqlFile || (dbPath !== ':memory:' ? dbPath : null),
+      tableCount: tableNames.length,
+      totalRows,
+      tables: tableNames
+    });
+  });
+
+  // Seed Mock Data into empty tables
+  app.post('/api/seed-mock', (req, res) => {
+    const { count = 10 } = req.body || {};
+    const seeder = new MockSeeder(adapter);
+    const results = seeder.seedAllTables(count);
+    cachedSchema = schemaExtractor.extractSchema();
+    nlEngine = new NlToSqlEngine(cachedSchema);
+    statisticsEngine = new TableStatistics(adapter);
+
+    let totalRows = 0;
+    for (const t of adapter.getTableNames()) {
+      totalRows += adapter.getTableRowCount(t);
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully generated realistic sample records across ${Object.keys(results).length} tables!`,
+      seeded: results,
+      totalRows,
+      schema: cachedSchema
+    });
+  });
 
   // 1. Get database schema graph for visual ERD
   app.get('/api/schema', (req, res) => {
@@ -191,12 +245,29 @@ export function createDbLensApp(config = {}) {
       });
     }
 
+    let executiveSummary = translation.executiveSummary;
+    if (rows.length === 0) {
+      const primaryTable = translation.primaryTable;
+      if (primaryTable) {
+        const tableTotal = adapter.getTableRowCount(primaryTable);
+        if (tableTotal === 0) {
+          executiveSummary = `Executed successfully. Note: Table '${primaryTable}' currently has 0 rows in this schema. Click '🌱 Seed Mock Data' in the toolbar to populate sample records for instant testing!`;
+        } else {
+          executiveSummary = `Executed successfully, but no records matched the given filter criteria.`;
+        }
+      } else {
+        executiveSummary = `Executed successfully. Returned 0 row(s).`;
+      }
+    } else if (!executiveSummary) {
+      executiveSummary = `Retrieved ${rows.length} records matching your query.`;
+    }
+
     res.json({
       success: true,
       prompt,
       sql: translation.sql,
       explanation: translation.explanation,
-      executiveSummary: translation.executiveSummary || `Retrieved ${rows.length} records matching your query.`,
+      executiveSummary,
       recommendedChart: translation.recommendedChart || 'table',
       chartConfig: translation.chartConfig || null,
       primaryTable: translation.primaryTable || null,

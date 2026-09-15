@@ -35,10 +35,10 @@
           TALK-TO-DB
         </span>
       </div>
-      <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700">v1.1.0</span>
+      <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono border border-slate-700">v1.2.0</span>
       <div class="hidden sm:flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-800/50">
         <span>🗄️</span>
-        <span id="activeDatasetLabel">University Database</span>
+        <span id="activeDatasetLabel">Active Database</span>
       </div>
     </div>
 
@@ -57,6 +57,10 @@
 
     <!-- Header Actions -->
     <div class="flex items-center gap-2">
+      <button id="seedMockDataBtn" class="flex items-center gap-1.5 bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300 text-xs font-semibold px-3 py-1.5 rounded-lg border border-emerald-700/60 shadow-sm transition-all cursor-pointer" title="Auto-populate empty tables with realistic sample data for instant query testing">
+        <span>🌱</span>
+        <span>Seed Mock Data</span>
+      </button>
       <button id="openAiModalBtn" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 transition-all cursor-pointer">
         <span id="aiStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
         <span>🔑 AI Settings</span>
@@ -98,9 +102,11 @@
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
               <span>✨</span> Ask Questions in Plain English (No SQL Required)
             </h3>
-            <span id="activeModeBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">⚡ Local Heuristic Mode</span>
+            <span id="activeModeBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+              ⚡ Local Heuristic Mode
+            </span>
           </div>
-          <span class="text-xs text-slate-500">Auto-converts to SQL with step-by-step logic explanation</span>
+          <span class="text-[11px] text-slate-500">Auto-converts to SQL with step-by-step logic explanation</span>
         </div>
 
         <div class="flex gap-2">
@@ -112,20 +118,8 @@
         </div>
 
         <!-- Quick Prompt Chips -->
-        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+        <div id="promptChipsContainer" class="flex flex-wrap items-center gap-1.5 text-xs">
           <span class="text-slate-500 mr-1">Try:</span>
-          <button class="prompt-chip bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors cursor-pointer">
-            Top 5 students with highest GPA
-          </button>
-          <button class="prompt-chip bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors cursor-pointer">
-            Average score in Database Systems
-          </button>
-          <button class="prompt-chip bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors cursor-pointer">
-            Instructors with salary above 1300000
-          </button>
-          <button class="prompt-chip bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors cursor-pointer">
-            List students with their department
-          </button>
         </div>
       </div>
 

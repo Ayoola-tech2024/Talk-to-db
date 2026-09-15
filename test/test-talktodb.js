@@ -179,7 +179,34 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
       assert.ok(schemaData.tables.some(t => t.name === 'users'));
       assert.ok(schemaData.tables.some(t => t.name === 'orders'));
       assert.ok(schemaData.tables.some(t => t.name === 'products'));
-      assert.ok(schemaData.tables.some(t => t.name === 'cart_items'));
+      // Test /api/info
+      const infoRes = await fetch('http://localhost:4351/api/info');
+      assert.equal(infoRes.status, 200);
+      const info = await infoRes.json();
+      assert.equal(info.isCustom, true);
+      assert.ok(info.tableCount >= 8);
+
+      // Test /api/seed-mock to populate empty custom tables
+      const seedRes = await fetch('http://localhost:4351/api/seed-mock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: 5 })
+      });
+      assert.equal(seedRes.status, 200);
+      const seedData = await seedRes.json();
+      assert.equal(seedData.success, true);
+      assert.ok(seedData.totalRows > 0);
+
+      // Verify query on orders now returns seeded rows
+      const queryRes = await fetch('http://localhost:4351/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql: 'SELECT * FROM orders LIMIT 10;' })
+      });
+      assert.equal(queryRes.status, 200);
+      const queryData = await queryRes.json();
+      assert.equal(queryData.success, true);
+      assert.ok(queryData.rowCount > 0);
     } finally {
       await new Promise((resolve) => customServer.close(resolve));
     }

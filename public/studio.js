@@ -3,10 +3,13 @@ let schemaData = { tables: [], relations: [] };
 let selectedTableName = null;
 let currentQueryRows = [];
 let isAiActive = false;
+let currentDbInfo = null;
 
 // DOM Elements
 const activeDatasetLabel = document.getElementById('activeDatasetLabel');
 const datasetSwitcher = document.getElementById('datasetSwitcher');
+const seedMockDataBtn = document.getElementById('seedMockDataBtn');
+const promptChipsContainer = document.getElementById('promptChipsContainer');
 const erdTableCount = document.getElementById('erdTableCount');
 const erdRelationCount = document.getElementById('erdRelationCount');
 const erdSvgCanvas = document.getElementById('erdSvgCanvas');
@@ -48,9 +51,86 @@ const previewTableBody = document.getElementById('previewTableBody');
 async function init() {
   setupEventListeners();
   await checkAiStatus();
+  await loadDbInfo();
   await loadSchema();
-  // Run default query
-  executeNlQuery('Top 5 students with highest GPA');
+
+  // Run initial query based on loaded schema
+  runInitialQuery();
+}
+
+// Load Database Info
+async function loadDbInfo() {
+  try {
+    const res = await fetch('/api/info');
+    currentDbInfo = await res.json();
+
+    if (currentDbInfo.isCustom) {
+      activeDatasetLabel.innerText = `${currentDbInfo.dbName} (Custom Schema)`;
+      // Add custom option to switcher if not present
+      if (!Array.from(datasetSwitcher.options).some(o => o.value === 'custom')) {
+        const opt = document.createElement('option');
+        opt.value = 'custom';
+        opt.innerText = `📄 ${currentDbInfo.dbName}`;
+        datasetSwitcher.prepend(opt);
+      }
+      datasetSwitcher.value = 'custom';
+    } else {
+      activeDatasetLabel.innerText = currentDbInfo.dbName;
+      datasetSwitcher.value = currentDbInfo.dbName.includes('Solar') ? 'ecommerce' : 'university';
+    }
+  } catch (err) {
+    console.error('Failed to load DB info:', err);
+  }
+}
+
+// Generate smart prompt chips based on actual tables
+function renderDynamicPromptChips() {
+  if (!promptChipsContainer) return;
+  promptChipsContainer.innerHTML = '<span class="text-slate-500 mr-1">Try:</span>';
+
+  const tableNames = (schemaData.tables || []).map(t => t.name.toLowerCase());
+  let suggestions = [];
+
+  if (tableNames.includes('orders') || tableNames.includes('products')) {
+    if (tableNames.includes('orders')) suggestions.push('Show all orders');
+    if (tableNames.includes('products')) suggestions.push('Top 5 products by price');
+    if (tableNames.includes('users')) suggestions.push('List registered users');
+    if (tableNames.includes('orders') && tableNames.includes('users')) suggestions.push('Orders with customer details');
+  } else if (tableNames.includes('students')) {
+    suggestions.push('Top 5 students with highest GPA');
+    suggestions.push('Average score in Database Systems');
+    suggestions.push('Instructors with salary above 1300000');
+    suggestions.push('List students with their department');
+  } else {
+    // Generic fallback for any arbitrary database schema
+    schemaData.tables.slice(0, 4).forEach(t => {
+      suggestions.push(`Show records from ${t.name}`);
+    });
+  }
+
+  suggestions.forEach(text => {
+    const btn = document.createElement('button');
+    btn.className = 'prompt-chip bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors cursor-pointer';
+    btn.innerText = text;
+    btn.addEventListener('click', () => {
+      nlPromptInput.value = text;
+      executeNlQuery(text);
+    });
+    promptChipsContainer.appendChild(btn);
+  });
+}
+
+function runInitialQuery() {
+  if (!schemaData.tables || schemaData.tables.length === 0) return;
+  const tableNames = schemaData.tables.map(t => t.name.toLowerCase());
+
+  if (tableNames.includes('orders')) {
+    executeNlQuery('Show all orders');
+  } else if (tableNames.includes('students')) {
+    executeNlQuery('Top 5 students with highest GPA');
+  } else {
+    executeNlQuery(`Show records from ${schemaData.tables[0].name}`);
+  }
 }
 
 // Setup Event Listeners
@@ -81,6 +161,35 @@ function setupEventListeners() {
       }
     });
   });
+
+  // Seed Mock Data Button
+  if (seedMockDataBtn) {
+    seedMockDataBtn.addEventListener('click', async () => {
+      seedMockDataBtn.disabled = true;
+      seedMockDataBtn.innerHTML = '<span>⏳</span> <span>Seeding...</span>';
+
+      try {
+        const res = await fetch('/api/seed-mock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ count: 10 })
+        });
+        const data = await res.json();
+        if (data.success) {
+          await loadSchema();
+          await loadDbInfo();
+          renderDynamicPromptChips();
+          runInitialQuery();
+          alert(`🌱 Success! Generated realistic mock data across ${Object.keys(data.seeded).length} tables!`);
+        }
+      } catch (err) {
+        alert('Failed to seed mock data: ' + err.message);
+      } finally {
+        seedMockDataBtn.disabled = false;
+        seedMockDataBtn.innerHTML = '<span>🌱</span> <span>Seed Mock Data</span>';
+      }
+    });
+  }
 
   // AI Modal Controls
   openAiModalBtn.addEventListener('click', () => aiModal.classList.remove('hidden'));
@@ -116,20 +225,18 @@ function setupEventListeners() {
   // Dataset Switcher
   datasetSwitcher.addEventListener('change', async () => {
     const ds = datasetSwitcher.value;
-    activeDatasetLabel.innerText = ds === 'university' ? 'University Database' : 'E-Commerce Database';
+    if (ds === 'custom') return;
+
+    activeDatasetLabel.innerText = ds === 'university' ? 'University Student DB' : 'Solar E-Commerce DB';
     await fetch('/api/dataset/load', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dataset: ds })
     });
     await loadSchema();
-    if (ds === 'university') {
-      nlPromptInput.placeholder = 'e.g., Top 5 students with highest GPA, or courses in Business Information Technology';
-      executeNlQuery('Top 5 students with highest GPA');
-    } else {
-      nlPromptInput.placeholder = 'e.g., Top 5 customers who spent the most, or products out of stock';
-      executeNlQuery('Top 5 customers who spent the most');
-    }
+    await loadDbInfo();
+    renderDynamicPromptChips();
+    runInitialQuery();
   });
 
   // Natural Language Ask Button
@@ -208,6 +315,7 @@ async function loadSchema() {
     erdRelationCount.innerText = schemaData.totalRelations || 0;
     renderErdDiagram();
     renderTableSelector();
+    renderDynamicPromptChips();
   } catch (err) {
     console.error('Failed to load schema:', err);
   }
