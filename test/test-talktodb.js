@@ -164,4 +164,25 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
     }
   });
 
+  await t.test('7. Custom PostgreSQL DDL Schema Loading (BuySolar schema test)', async () => {
+    const customSchemaPath = path.resolve('C:\\Users\\Martins Udek\\Desktop\\buysolar.ng\\sql\\schema.sql');
+    const customApp = createDbLensApp({ port: 4351, customSqlFile: customSchemaPath });
+    const customServer = http.createServer(customApp);
+
+    await new Promise((resolve) => customServer.listen(4351, resolve));
+
+    try {
+      const res = await fetch('http://localhost:4351/api/schema');
+      assert.equal(res.status, 200);
+      const schemaData = await res.json();
+      assert.ok(schemaData.tableCount >= 8);
+      assert.ok(schemaData.tables.some(t => t.name === 'users'));
+      assert.ok(schemaData.tables.some(t => t.name === 'orders'));
+      assert.ok(schemaData.tables.some(t => t.name === 'products'));
+      assert.ok(schemaData.tables.some(t => t.name === 'cart_items'));
+    } finally {
+      await new Promise((resolve) => customServer.close(resolve));
+    }
+  });
+
 });

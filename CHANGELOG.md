@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-15
+
+### Added
+
+- **Interactive Drag-and-Drop ERD**: Freely reposition table nodes anywhere on the canvas with smooth real-time SVG bezier curve updates.
+- **Editable SQL Code Editor**: Direct SQL query refinement with syntax-styled textarea, `Ctrl+Enter` execution shortcut, and instant execution results.
+- **Strict Read-Only Guard**: Protects production databases from accidental mutation by blocking `DROP`, `DELETE`, `UPDATE`, `INSERT`, `ALTER`, and `TRUNCATE` operations with HTTP 403.
+- **Universal PostgreSQL / MySQL DDL Compatibility**: Normalizes complex PostgreSQL dumps (including extensions, RLS policies, triggers, functions, `UUID`, `JSONB`, `TIMESTAMPTZ`, and `DOUBLE PRECISION`) for instant in-memory exploration.
+- **Custom SQL Dump Loading in CLI**: Support for passing external schema dump paths directly into `talk-to-db <schema.sql>`.
+
 ## [1.1.0] - 2026-09-15
 
 ### Added

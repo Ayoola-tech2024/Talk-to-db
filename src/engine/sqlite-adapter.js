@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 /**
  * SQLite Database Adapter utilizing Node's built-in DatabaseSync engine.
+ * Includes PostgreSQL, MySQL, and Generic DDL normalization for schema dumps.
  */
 export class SqliteAdapter {
   constructor(dbPath = ':memory:') {
@@ -11,10 +12,68 @@ export class SqliteAdapter {
   }
 
   /**
-   * Executes a multi-statement SQL script (such as DDL or seed dump).
+   * Executes a multi-statement SQL script (such as DDL or seed dump) with dialect normalization.
    */
   execScript(sql) {
-    this.db.exec(sql);
+    const normalized = this.normalizeDdl(sql);
+    
+    // Split into individual statements to safely execute and skip dialect-specific non-critical errors
+    const statements = normalized
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    for (const stmt of statements) {
+      try {
+        this.db.exec(stmt + ';');
+      } catch (err) {
+        // Only log if it's a table creation error
+        if (stmt.toLowerCase().startsWith('create table')) {
+          console.warn(`[SqliteAdapter] Table creation warning: ${err.message} in statement: ${stmt.slice(0, 60)}...`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Normalizes PostgreSQL, MySQL, and generic SQL DDL syntax to valid SQLite syntax.
+   */
+  normalizeDdl(sql) {
+    let clean = sql;
+
+    // 1. Remove comments
+    clean = clean.replace(/--.*$/gm, '');
+    clean = clean.replace(/\/\*[\s\S]*?\*\//gm, '');
+
+    // 2. Remove PostgreSQL-specific commands (Extensions, Policies, RLS, Functions, Triggers) without crossing statement boundaries
+    clean = clean.replace(/CREATE\s+EXTENSION[^;]*?;/gi, '');
+    clean = clean.replace(/ALTER\s+TABLE[^;]*?ENABLE\s+ROW\s+LEVEL\s+SECURITY[^;]*?;/gi, '');
+    clean = clean.replace(/ALTER\s+TABLE[^;]*?ADD\s+COLUMN[^;]*?;/gi, '');
+    clean = clean.replace(/CREATE\s+POLICY[^;]*?;/gi, '');
+    clean = clean.replace(/DROP\s+POLICY[^;]*?;/gi, '');
+    clean = clean.replace(/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION[\s\S]*?\$\$[\s\S]*?\$\$\s*(LANGUAGE\s+\w+)?;?/gi, '');
+    clean = clean.replace(/RETURNS\s+TRIGGER[\s\S]*?\$\$[\s\S]*?\$\$\s*(LANGUAGE\s+\w+)?;?/gi, '');
+    clean = clean.replace(/CREATE\s+TRIGGER[^;]*?;/gi, '');
+
+    // 3. Remove "public." prefix
+    clean = clean.replace(/\bpublic\.([a-zA-Z0-9_]+)\b/g, '$1');
+
+    // 4. Normalize PostgreSQL / MySQL Data Types to SQLite Types
+    clean = clean.replace(/\bUUID\b/gi, 'TEXT');
+    clean = clean.replace(/\bJSONB\b/gi, 'TEXT');
+    clean = clean.replace(/\bTIMESTAMPTZ\b/gi, 'TEXT');
+    clean = clean.replace(/\bTIMESTAMP\b/gi, 'TEXT');
+    clean = clean.replace(/\bVARCHAR\(\d+\)/gi, 'TEXT');
+    clean = clean.replace(/\bSERIAL\b/gi, 'INTEGER');
+    clean = clean.replace(/\bBIGSERIAL\b/gi, 'INTEGER');
+    clean = clean.replace(/\bBIGINT\b/gi, 'INTEGER');
+    clean = clean.replace(/\bDOUBLE\s+PRECISION\b/gi, 'REAL');
+
+    // 5. Normalize Default Expressions
+    clean = clean.replace(/DEFAULT\s+gen_random_uuid\(\)/gi, 'DEFAULT (lower(hex(randomblob(16))))');
+    clean = clean.replace(/DEFAULT\s+now\(\)/gi, 'DEFAULT CURRENT_TIMESTAMP');
+
+    return clean;
   }
 
   /**

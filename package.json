@@ -1,6 +1,6 @@
 {
   "name": "@damisile_ayoola/talk-to-db",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Interactive visual database explorer, auto ERD diagram generator, and plain-English natural language query assistant for students, analysts, and developers.",
   "type": "module",
   "main": "src/index.js",

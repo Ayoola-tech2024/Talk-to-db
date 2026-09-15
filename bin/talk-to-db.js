@@ -26,6 +26,7 @@ async function start() {
   const port = parseInt(options.port, 10) || 4300;
   let dbPath = ':memory:';
   let defaultDataset = options.dataset || 'university';
+  let customSqlFile = null;
 
   if (args[0]) {
     const resolved = path.resolve(process.cwd(), args[0]);
@@ -33,6 +34,7 @@ async function start() {
       if (resolved.endsWith('.sql')) {
         // Raw SQL file: run in memory and seed it
         dbPath = ':memory:';
+        customSqlFile = resolved;
       } else {
         dbPath = resolved;
       }
@@ -45,13 +47,14 @@ async function start() {
   const app = createDbLensApp({
     dbPath,
     defaultDataset,
+    customSqlFile,
     port
   });
 
   const server = http.createServer(app);
 
   server.listen(port, () => {
-    printBanner({ port, dbPath, defaultDataset });
+    printBanner({ port, dbPath, defaultDataset, customSqlFile });
   });
 
   const shutdown = () => {
@@ -66,7 +69,7 @@ async function start() {
   process.on('SIGTERM', shutdown);
 }
 
-function printBanner({ port, dbPath, defaultDataset }) {
+function printBanner({ port, dbPath, defaultDataset, customSqlFile }) {
   console.log(pc.cyan(`
   ████████╗ █████╗ ██╗     ██╗  ██╗████████╗ ██████╗       ██████╗ ██████╗ 
   ╚══██╔══╝██╔══██╗██║     ██║ ██╔╝╚══██╔══╝██╔═══██╗      ██╔══██╗██╔══██╗
@@ -78,7 +81,17 @@ function printBanner({ port, dbPath, defaultDataset }) {
   console.log(pc.dim('  Visual Database Explorer & Plain-English SQL Query Assistant'));
   console.log(pc.dim('  ----------------------------------------------------------------'));
   console.log(`  ${pc.bold('🖥️  Interactive Web Studio:')}  ${pc.green(`http://localhost:${port}/`)}`);
-  console.log(`  ${pc.bold('🗄️  Active Database:')}         ${pc.magenta(dbPath === ':memory:' ? `In-Memory (${defaultDataset} demo)` : dbPath)}`);
+  
+  let sourceLabel = '';
+  if (customSqlFile) {
+    sourceLabel = `Custom SQL Dump (${path.basename(customSqlFile)})`;
+  } else if (dbPath === ':memory:') {
+    sourceLabel = `In-Memory (${defaultDataset} demo)`;
+  } else {
+    sourceLabel = dbPath;
+  }
+  
+  console.log(`  ${pc.bold('🗄️  Active Database:')}         ${pc.magenta(sourceLabel)}`);
   console.log(`  ${pc.bold('💡 Plain English Prompting:')} Type questions naturally — no SQL required!`);
   console.log(pc.dim('  ----------------------------------------------------------------'));
   console.log(pc.gray('  Press Ctrl+C to stop.\n'));

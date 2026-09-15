@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { SqliteAdapter } from './engine/sqlite-adapter.js';
 import { SchemaExtractor } from './engine/schema-extractor.js';
@@ -12,12 +13,18 @@ const __dirname = path.dirname(__filename);
 
 export function createDbLensApp(config = {}) {
   const app = express();
-  const { dbPath = ':memory:', defaultDataset = 'university', port = 4300 } = config;
+  const { dbPath = ':memory:', defaultDataset = null, customSqlFile = null, port = 4300 } = config;
 
   let adapter = new SqliteAdapter(dbPath);
 
-  // If memory database and default dataset specified, seed it
-  if (dbPath === ':memory:' || defaultDataset) {
+  // If custom SQL file provided, seed it into the adapter
+  if (customSqlFile && fs.existsSync(customSqlFile)) {
+    try {
+      adapter.loadSqlFile(customSqlFile);
+    } catch (err) {
+      console.error(`Failed to load custom SQL file '${customSqlFile}':`, err.message);
+    }
+  } else if (defaultDataset) {
     const datasetPath = path.join(__dirname, 'datasets', `${defaultDataset}.sql`);
     try {
       adapter.loadSqlFile(datasetPath);
