@@ -176,9 +176,22 @@ export class NlToSqlEngine {
 
     const explanation = `**Step-by-step Query Logic**:\n` + explanationSteps.map((s, i) => `${i + 1}. ${s}`).join('\n');
 
+    // Generate human-friendly executive takeaway
+    let execSummary = `Retrieved matching records from **${primaryTable}**.`;
+    if (isCountQuery) {
+      execSummary = `Count query calculating the total volume of records in **${primaryTable}**.`;
+    } else if (isAvgQuery) {
+      execSummary = `Statistical aggregation computing the average metric across **${primaryTable}**.`;
+    } else if (orderClause.includes('DESC')) {
+      execSummary = `Ranked the top records from **${primaryTable}** in descending order.`;
+    } else if (whereClause) {
+      execSummary = `Filtered **${primaryTable}** records matching your custom criteria.`;
+    }
+
     return {
       sql: finalSql,
       explanation,
+      executiveSummary: execSummary,
       primaryTable,
       confidence: 0.95
     };

@@ -24,7 +24,10 @@ const activeModeBadge = document.getElementById('activeModeBadge');
 
 const nlPromptInput = document.getElementById('nlPromptInput');
 const askNlBtn = document.getElementById('askNlBtn');
-const generatedSqlViewer = document.getElementById('generatedSqlViewer');
+const sqlEditor = document.getElementById('sqlEditor');
+const runCustomSqlBtn = document.getElementById('runCustomSqlBtn');
+const queryErrorAlert = document.getElementById('queryErrorAlert');
+const queryErrorMessage = document.getElementById('queryErrorMessage');
 const queryExplanationBox = document.getElementById('queryExplanationBox');
 const executiveStoryText = document.getElementById('executiveStoryText');
 const queryRowCountBadge = document.getElementById('queryRowCountBadge');
@@ -152,9 +155,23 @@ function setupEventListeners() {
 
   // Copy SQL Button
   copySqlBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(generatedSqlViewer.innerText);
+    navigator.clipboard.writeText(sqlEditor.value);
     copySqlBtn.innerText = '✅ Copied!';
-    setTimeout(() => { copySqlBtn.innerText = '📋 Copy SQL'; }, 2000);
+    setTimeout(() => { copySqlBtn.innerText = '📋 Copy'; }, 2000);
+  });
+
+  // Run Custom Edited SQL Button
+  runCustomSqlBtn.addEventListener('click', () => {
+    const rawSql = sqlEditor.value.trim();
+    if (rawSql) executeCustomSqlQuery(rawSql);
+  });
+
+  // Ctrl+Enter in SQL Editor
+  sqlEditor.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      const rawSql = sqlEditor.value.trim();
+      if (rawSql) executeCustomSqlQuery(rawSql);
+    }
   });
 
   // Export CSV Button
@@ -358,6 +375,7 @@ function drawRelationshipCurves(positions) {
 async function executeNlQuery(prompt) {
   askNlBtn.disabled = true;
   askNlBtn.innerText = 'Analyzing...';
+  queryErrorAlert.classList.add('hidden');
 
   try {
     const res = await fetch('/api/ask', {
@@ -367,7 +385,8 @@ async function executeNlQuery(prompt) {
     });
 
     const data = await res.json();
-    generatedSqlViewer.innerText = data.sql || 'SELECT * FROM students;';
+    sqlEditor.value = data.sql || 'SELECT * FROM students;';
+    
     queryExplanationBox.innerHTML = (data.explanation || 'Selects matching records.')
       .replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-200">$1</strong>')
       .replace(/`([^`]+)`/g, '<code class="text-emerald-400 bg-slate-900 px-1 rounded font-mono text-[11px]">$1</code>')
@@ -376,16 +395,65 @@ async function executeNlQuery(prompt) {
     executiveStoryText.innerHTML = (data.executiveSummary || 'Query executed successfully.')
       .replace(/\*\*(.*?)\*\*/g, '<strong class="text-emerald-300 font-bold">$1</strong>');
 
+    if (!data.success && data.error) {
+      queryErrorAlert.classList.remove('hidden');
+      queryErrorMessage.innerText = data.error;
+    } else {
+      queryErrorAlert.classList.add('hidden');
+    }
+
     queryRowCountBadge.innerText = `${data.rowCount || 0} row${data.rowCount === 1 ? '' : 's'} found`;
     queryDurationBadge.innerText = `(${data.durationMs || 0}ms - ${data.mode || 'local'})`;
 
     currentQueryRows = data.rows || [];
     renderDataTable(currentQueryRows, queryTableHead, queryTableBody);
   } catch (err) {
-    console.error('Failed to execute query:', err);
+    queryErrorAlert.classList.remove('hidden');
+    queryErrorMessage.innerText = err.message;
   } finally {
     askNlBtn.disabled = false;
     askNlBtn.innerText = '🚀 Run Query';
+  }
+}
+
+// Execute Custom Edited SQL directly
+async function executeCustomSqlQuery(sql) {
+  runCustomSqlBtn.disabled = true;
+  runCustomSqlBtn.innerText = 'Running...';
+  queryErrorAlert.classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sql })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      queryErrorAlert.classList.add('hidden');
+      queryRowCountBadge.innerText = `${data.rowCount || 0} row${data.rowCount === 1 ? '' : 's'} found`;
+      queryDurationBadge.innerText = `(${data.durationMs || 0}ms - manual SQL)`;
+      
+      executiveStoryText.innerHTML = `Custom SQL executed successfully. Returned <strong class="text-emerald-300">${data.rowCount}</strong> row(s).`;
+      queryExplanationBox.innerHTML = `Manually executed SQL statement against the active database.`;
+
+      currentQueryRows = data.rows || [];
+      renderDataTable(currentQueryRows, queryTableHead, queryTableBody);
+    } else {
+      queryErrorAlert.classList.remove('hidden');
+      queryErrorMessage.innerText = data.error || 'SQL syntax or execution error.';
+      queryRowCountBadge.innerText = '0 rows';
+      currentQueryRows = [];
+      renderDataTable([], queryTableHead, queryTableBody);
+    }
+  } catch (err) {
+    queryErrorAlert.classList.remove('hidden');
+    queryErrorMessage.innerText = err.message;
+  } finally {
+    runCustomSqlBtn.disabled = false;
+    runCustomSqlBtn.innerText = '▶ Run SQL';
   }
 }
 

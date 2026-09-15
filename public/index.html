@@ -136,16 +136,36 @@
         <div class="w-full md:w-96 border-r border-slate-800 p-4 flex flex-col gap-3 overflow-y-auto custom-scroll bg-slate-900/20">
           <div>
             <div class="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-              <span class="font-bold">Generated SQL Statement</span>
-              <button id="copySqlBtn" class="hover:text-emerald-400 cursor-pointer">📋 Copy SQL</button>
+              <span class="font-bold flex items-center gap-1.5 text-slate-200">
+                <span>✏️</span> SQL Editor <span class="text-[10px] font-normal text-slate-500">(Editable)</span>
+              </span>
+              <div class="flex items-center gap-2">
+                <button id="copySqlBtn" class="hover:text-emerald-400 text-[11px] cursor-pointer">📋 Copy</button>
+              </div>
             </div>
-            <pre id="generatedSqlViewer" class="bg-slate-900 p-3 rounded-xl border border-slate-800 font-mono text-xs text-emerald-300 overflow-x-auto custom-scroll leading-relaxed select-all">SELECT * FROM students LIMIT 10;</pre>
+            
+            <textarea id="sqlEditor" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-emerald-300 focus:outline-none focus:border-emerald-500 leading-relaxed custom-scroll resize-y" placeholder="Enter or edit SQL query here..."></textarea>
+            
+            <div class="flex items-center justify-between mt-2">
+              <span class="text-[10px] text-slate-500 font-mono">Press Ctrl+Enter to run</span>
+              <button id="runCustomSqlBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer">
+                <span>▶ Run SQL</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Error Alert Banner (Hidden by default) -->
+          <div id="queryErrorAlert" class="hidden bg-rose-950/50 border border-rose-800/80 rounded-xl p-3 flex flex-col gap-1 text-xs text-rose-300">
+            <span class="font-bold flex items-center gap-1 text-rose-200">
+              <span>⚠️</span> SQL Execution Error
+            </span>
+            <span id="queryErrorMessage" class="font-mono text-[11px] text-rose-400 break-words"></span>
           </div>
 
           <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-1.5 text-xs text-slate-300">
             <span class="font-bold text-slate-200">💡 Step-by-Step Logic Explanation</span>
             <div id="queryExplanationBox" class="leading-relaxed text-slate-400">
-              Selects the first 10 students from the database.
+              Selects matching records from the database.
             </div>
           </div>
         </div>
