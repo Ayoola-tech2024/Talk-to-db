@@ -137,7 +137,18 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
       assert.equal(askData.rows[0].gpa, 4.88);
       assert.ok(askData.executiveSummary);
 
-      // 4. Test /api/dataset/load to switch to ecommerce
+      // 4. Test Read-Only Safety Guard on destructive query
+      const deleteAttempt = await fetch('http://localhost:4350/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql: 'DELETE FROM students WHERE id = 1;' })
+      });
+      assert.equal(deleteAttempt.status, 403);
+      const deleteData = await deleteAttempt.json();
+      assert.equal(deleteData.success, false);
+      assert.ok(deleteData.error.includes('Read-Only Guard'));
+
+      // 5. Test /api/dataset/load to switch to ecommerce
       const swapRes = await fetch('http://localhost:4350/api/dataset/load', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

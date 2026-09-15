@@ -68,11 +68,25 @@ export function createDbLensApp(config = {}) {
     });
   });
 
-  // 4. Execute raw SQL query
+  // 4. Execute raw SQL query with strict Read-Only Safety Guard
   app.post('/api/query', (req, res) => {
     const { sql } = req.body || {};
     if (!sql) {
       return res.status(400).json({ error: 'SQL query string is required' });
+    }
+
+    // Strict Read-Only Safety Guard: Blocks any mutation or destructive commands
+    const sanitized = sql.trim().toLowerCase();
+    const forbiddenKeywords = ['drop ', 'delete ', 'truncate ', 'alter ', 'update ', 'insert into', 'create table', 'vacuum'];
+    const isMutation = forbiddenKeywords.some(keyword => sanitized.startsWith(keyword) || sanitized.includes(`; ${keyword}`) || sanitized.includes(`;\n${keyword}`));
+
+    if (isMutation) {
+      return res.status(403).json({
+        success: false,
+        sql,
+        error: '🛡️ Read-Only Guard: TalkToDB only allows data exploration (SELECT/PRAGMA). Write and delete operations are strictly blocked to protect your database.',
+        durationMs: 0
+      });
     }
 
     const startTime = Date.now();
