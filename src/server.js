@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { SqliteAdapter } from './engine/sqlite-adapter.js';
+import { PostgresAdapter } from './engine/postgres-adapter.js';
 import { SchemaExtractor } from './engine/schema-extractor.js';
 import { NlToSqlEngine } from './engine/nl-to-sql.js';
 import { TableStatistics } from './engine/statistics.js';
@@ -12,30 +13,39 @@ import { MockSeeder } from './engine/mock-seeder.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export function createDbLensApp(config = {}) {
+export async function createDbLensApp(config = {}) {
   const app = express();
   const { dbPath = ':memory:', defaultDataset = null, customSqlFile = null, port = 4300 } = config;
 
-  let adapter = new SqliteAdapter(dbPath);
+  let adapter;
+  let isPostgres = false;
 
-  // If custom SQL file provided, seed it into the adapter
-  if (customSqlFile && fs.existsSync(customSqlFile)) {
-    try {
-      adapter.loadSqlFile(customSqlFile);
-    } catch (err) {
-      console.error(`Failed to load custom SQL file '${customSqlFile}':`, err.message);
-    }
-  } else if (defaultDataset) {
-    const datasetPath = path.join(__dirname, 'datasets', `${defaultDataset}.sql`);
-    try {
-      adapter.loadSqlFile(datasetPath);
-    } catch (err) {
-      console.error(`Failed to seed default dataset '${defaultDataset}':`, err.message);
+  if (typeof dbPath === 'string' && (dbPath.startsWith('postgres://') || dbPath.startsWith('postgresql://'))) {
+    adapter = new PostgresAdapter(dbPath);
+    await adapter.init();
+    isPostgres = true;
+  } else {
+    adapter = new SqliteAdapter(dbPath);
+
+    // If custom SQL file provided, seed it into the adapter
+    if (customSqlFile && fs.existsSync(customSqlFile)) {
+      try {
+        adapter.loadSqlFile(customSqlFile);
+      } catch (err) {
+        console.error(`Failed to load custom SQL file '${customSqlFile}':`, err.message);
+      }
+    } else if (defaultDataset) {
+      const datasetPath = path.join(__dirname, 'datasets', `${defaultDataset}.sql`);
+      try {
+        adapter.loadSqlFile(datasetPath);
+      } catch (err) {
+        console.error(`Failed to seed default dataset '${defaultDataset}':`, err.message);
+      }
     }
   }
 
   let schemaExtractor = new SchemaExtractor(adapter);
-  let cachedSchema = schemaExtractor.extractSchema();
+  let cachedSchema = await schemaExtractor.extractSchema();
   let nlEngine = new NlToSqlEngine(cachedSchema);
   let statisticsEngine = new TableStatistics(adapter);
   let aiEngine = new AiEngine();
@@ -49,10 +59,18 @@ export function createDbLensApp(config = {}) {
   // --- REST APIs ---
 
   // 0. Get Active Database Info
-  app.get('/api/info', (req, res) => {
+  app.get('/api/info', async (req, res) => {
     let dbName = 'University Student DB';
     let isCustom = false;
-    if (customSqlFile) {
+    if (isPostgres) {
+      try {
+        const u = new URL(dbPath);
+        dbName = `PostgreSQL Live (${u.pathname.replace('/', '') || 'db'} on ${u.hostname})`;
+      } catch {
+        dbName = 'PostgreSQL Live DB';
+      }
+      isCustom = true;
+    } else if (customSqlFile) {
       dbName = path.basename(customSqlFile);
       isCustom = true;
     } else if (dbPath !== ':memory:') {
@@ -62,15 +80,16 @@ export function createDbLensApp(config = {}) {
       dbName = defaultDataset === 'ecommerce' ? 'Solar E-Commerce DB' : 'University Student DB';
     }
 
-    const tableNames = adapter.getTableNames();
+    const tableNames = await adapter.getTableNames();
     let totalRows = 0;
     for (const t of tableNames) {
-      totalRows += adapter.getTableRowCount(t);
+      totalRows += await adapter.getTableRowCount(t);
     }
 
     res.json({
       dbName,
       isCustom,
+      isPostgres,
       sourcePath: customSqlFile || (dbPath !== ':memory:' ? dbPath : null),
       tableCount: tableNames.length,
       totalRows,
@@ -78,12 +97,19 @@ export function createDbLensApp(config = {}) {
     });
   });
 
-  // Seed Mock Data into empty tables
-  app.post('/api/seed-mock', (req, res) => {
+  // Seed Mock Data into empty tables (disabled for live PostgreSQL for safety)
+  app.post('/api/seed-mock', async (req, res) => {
+    if (isPostgres) {
+      return res.status(403).json({
+        success: false,
+        error: '🛡️ Safety Notice: Seed Mock Data is disabled on live remote PostgreSQL databases to guarantee 100% data integrity.'
+      });
+    }
+
     const { count = 10 } = req.body || {};
     const seeder = new MockSeeder(adapter);
     const results = seeder.seedAllTables(count);
-    cachedSchema = schemaExtractor.extractSchema();
+    cachedSchema = await schemaExtractor.extractSchema();
     nlEngine = new NlToSqlEngine(cachedSchema);
     statisticsEngine = new TableStatistics(adapter);
 
@@ -102,8 +128,8 @@ export function createDbLensApp(config = {}) {
   });
 
   // 1. Get database schema graph for visual ERD
-  app.get('/api/schema', (req, res) => {
-    cachedSchema = schemaExtractor.extractSchema();
+  app.get('/api/schema', async (req, res) => {
+    cachedSchema = await schemaExtractor.extractSchema();
     nlEngine = new NlToSqlEngine(cachedSchema);
     res.json(cachedSchema);
   });
@@ -130,7 +156,7 @@ export function createDbLensApp(config = {}) {
   });
 
   // 4. Execute raw SQL query with strict Read-Only Safety Guard
-  app.post('/api/query', (req, res) => {
+  app.post('/api/query', async (req, res) => {
     const { sql } = req.body || {};
     if (!sql) {
       return res.status(400).json({ error: 'SQL query string is required' });
@@ -138,7 +164,7 @@ export function createDbLensApp(config = {}) {
 
     // Strict Read-Only Safety Guard: Blocks any mutation or destructive commands
     const sanitized = sql.trim().toLowerCase();
-    const forbiddenKeywords = ['drop ', 'delete ', 'truncate ', 'alter ', 'update ', 'insert into', 'create table', 'vacuum'];
+    const forbiddenKeywords = ['drop ', 'delete ', 'truncate ', 'alter ', 'update ', 'insert into', 'create table', 'grant ', 'revoke ', 'vacuum'];
     const isMutation = forbiddenKeywords.some(keyword => sanitized.startsWith(keyword) || sanitized.includes(`; ${keyword}`) || sanitized.includes(`;\n${keyword}`));
 
     if (isMutation) {
@@ -152,7 +178,7 @@ export function createDbLensApp(config = {}) {
 
     const startTime = Date.now();
     try {
-      const rows = adapter.query(sql);
+      const rows = await adapter.query(sql);
       const durationMs = Date.now() - startTime;
       res.json({
         success: true,
@@ -207,7 +233,7 @@ export function createDbLensApp(config = {}) {
     let queryError = null;
 
     try {
-      rows = adapter.query(translation.sql);
+      rows = await adapter.query(translation.sql);
     } catch (execErr) {
       queryError = execErr.message;
 
@@ -219,7 +245,7 @@ export function createDbLensApp(config = {}) {
             schema: cachedSchema,
             errorContext: { sql: translation.sql, error: queryError }
           });
-          rows = adapter.query(healed.sql);
+          rows = await adapter.query(healed.sql);
           translation = healed;
           queryError = null;
           modeUsed += ' (auto-healed)';
@@ -249,7 +275,7 @@ export function createDbLensApp(config = {}) {
     if (rows.length === 0) {
       const primaryTable = translation.primaryTable;
       if (primaryTable) {
-        const tableTotal = adapter.getTableRowCount(primaryTable);
+        const tableTotal = await adapter.getTableRowCount(primaryTable);
         if (tableTotal === 0) {
           executiveSummary = `Executed successfully. Note: Table '${primaryTable}' currently has 0 rows in this schema. Click '🌱 Seed Mock Data' in the toolbar to populate sample records for instant testing!`;
         } else {
@@ -279,20 +305,20 @@ export function createDbLensApp(config = {}) {
   });
 
   // 4. Get table preview rows
-  app.get('/api/table/:name/rows', (req, res) => {
+  app.get('/api/table/:name/rows', async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 50;
-    const rows = adapter.getTableSampleRows(req.params.name, limit);
+    const rows = await adapter.getTableSampleRows(req.params.name, limit);
     res.json({ tableName: req.params.name, count: rows.length, rows });
   });
 
   // 5. Get table statistical quality profile
-  app.get('/api/table/:name/stats', (req, res) => {
-    const profile = statisticsEngine.profileTable(req.params.name);
+  app.get('/api/table/:name/stats', async (req, res) => {
+    const profile = await statisticsEngine.profileTable(req.params.name);
     res.json(profile);
   });
 
   // 6. Load a different demo dataset
-  app.post('/api/dataset/load', (req, res) => {
+  app.post('/api/dataset/load', async (req, res) => {
     const { dataset = 'university' } = req.body || {};
     const datasetPath = path.join(__dirname, 'datasets', `${dataset}.sql`);
 
@@ -302,7 +328,7 @@ export function createDbLensApp(config = {}) {
       adapter.loadSqlFile(datasetPath);
 
       schemaExtractor = new SchemaExtractor(adapter);
-      cachedSchema = schemaExtractor.extractSchema();
+      cachedSchema = await schemaExtractor.extractSchema();
       nlEngine = new NlToSqlEngine(cachedSchema);
       statisticsEngine = new TableStatistics(adapter);
 
@@ -316,6 +342,8 @@ export function createDbLensApp(config = {}) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(publicDir, 'index.html'));
   });
+
+  app.adapter = adapter;
 
   return app;
 }

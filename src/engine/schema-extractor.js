@@ -9,8 +9,8 @@ export class SchemaExtractor {
   /**
    * Generates the complete schema graph with tables, columns, relations, and ERD layout coordinates.
    */
-  extractSchema() {
-    const tableNames = this.adapter.getTableNames();
+  async extractSchema() {
+    const tableNames = await this.adapter.getTableNames();
     const tables = [];
     const relations = [];
 
@@ -19,10 +19,12 @@ export class SchemaExtractor {
     const SPACING_X = 320;
     const SPACING_Y = 280;
 
-    tableNames.forEach((tableName, index) => {
-      const rawCols = this.adapter.getTableColumns(tableName);
-      const rawFks = this.adapter.getTableForeignKeys(tableName);
-      const rowCount = this.adapter.getTableRowCount(tableName);
+    const tableResults = await Promise.all(tableNames.map(async (tableName, index) => {
+      const [rawCols, rawFks, rowCount] = await Promise.all([
+        this.adapter.getTableColumns(tableName),
+        this.adapter.getTableForeignKeys(tableName),
+        this.adapter.getTableRowCount(tableName)
+      ]);
 
       const columns = rawCols.map(c => ({
         name: c.name,
@@ -38,26 +40,31 @@ export class SchemaExtractor {
       const x = 40 + colIndex * SPACING_X;
       const y = 40 + rowIndex * SPACING_Y;
 
-      tables.push({
-        name: tableName,
-        columns,
-        rowCount,
-        position: { x, y }
-      });
+      const tableRelations = rawFks.map(fk => ({
+        id: `rel_${tableName}_${fk.from}_to_${fk.table}_${fk.to}`,
+        fromTable: tableName,
+        fromColumn: fk.from,
+        toTable: fk.table,
+        toColumn: fk.to,
+        onUpdate: fk.on_update,
+        onDelete: fk.on_delete
+      }));
 
-      // Record foreign key connections
-      rawFks.forEach(fk => {
-        relations.push({
-          id: `rel_${tableName}_${fk.from}_to_${fk.table}_${fk.to}`,
-          fromTable: tableName,
-          fromColumn: fk.from,
-          toTable: fk.table,
-          toColumn: fk.to,
-          onUpdate: fk.on_update,
-          onDelete: fk.on_delete
-        });
-      });
-    });
+      return {
+        table: {
+          name: tableName,
+          columns,
+          rowCount,
+          position: { x, y }
+        },
+        relations: tableRelations
+      };
+    }));
+
+    for (const r of tableResults) {
+      tables.push(r.table);
+      relations.push(...r.relations);
+    }
 
     return {
       tableCount: tables.length,

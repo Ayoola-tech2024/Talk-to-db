@@ -9,9 +9,9 @@ export class TableStatistics {
   /**
    * Generates a complete data profile for a single table.
    */
-  profileTable(tableName) {
-    const rowCount = this.adapter.getTableRowCount(tableName);
-    const columns = this.adapter.getTableColumns(tableName);
+  async profileTable(tableName) {
+    const rowCount = await this.adapter.getTableRowCount(tableName);
+    const columns = await this.adapter.getTableColumns(tableName);
     const colProfiles = [];
 
     if (rowCount === 0) {
@@ -22,7 +22,7 @@ export class TableStatistics {
       };
     }
 
-    columns.forEach(col => {
+    for (const col of columns) {
       try {
         const statsQuery = `
           SELECT 
@@ -30,10 +30,10 @@ export class TableStatistics {
             COUNT(DISTINCT "${col.name}") as distinct_count
           FROM "${tableName}";
         `;
-        const res = this.adapter.query(statsQuery)[0] || { null_count: 0, distinct_count: 0 };
-        const nullCount = res.null_count || 0;
+        const res = (await this.adapter.query(statsQuery))[0] || { null_count: 0, distinct_count: 0 };
+        const nullCount = parseInt(res.null_count, 10) || 0;
         const nullRate = Math.round((nullCount / rowCount) * 100);
-        const distinctCount = res.distinct_count || 0;
+        const distinctCount = parseInt(res.distinct_count, 10) || 0;
 
         colProfiles.push({
           name: col.name,
@@ -53,7 +53,7 @@ export class TableStatistics {
           distinctCount: 0
         });
       }
-    });
+    }
 
     return {
       tableName,

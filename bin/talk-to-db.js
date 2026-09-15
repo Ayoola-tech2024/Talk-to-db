@@ -27,49 +27,62 @@ async function start() {
   let dbPath = ':memory:';
   let defaultDataset = options.dataset || 'university';
   let customSqlFile = null;
+  let isPostgres = false;
 
   if (args[0]) {
-    const resolved = path.resolve(process.cwd(), args[0]);
-    if (fs.existsSync(resolved)) {
-      if (resolved.endsWith('.sql')) {
-        // Raw SQL file: run in memory and seed it
-        dbPath = ':memory:';
-        customSqlFile = resolved;
-      } else {
-        dbPath = resolved;
-      }
+    const rawArg = args[0];
+    if (rawArg.startsWith('postgres://') || rawArg.startsWith('postgresql://')) {
+      dbPath = rawArg;
       defaultDataset = null;
+      isPostgres = true;
     } else {
-      console.log(pc.yellow(`  ⚠️  File '${args[0]}' not found. Launching with demo dataset instead.`));
+      const resolved = path.resolve(process.cwd(), rawArg);
+      if (fs.existsSync(resolved)) {
+        if (resolved.endsWith('.sql')) {
+          // Raw SQL file: run in memory and seed it
+          dbPath = ':memory:';
+          customSqlFile = resolved;
+        } else {
+          dbPath = resolved;
+        }
+        defaultDataset = null;
+      } else {
+        console.log(pc.yellow(`  ⚠️  File '${args[0]}' not found. Launching with demo dataset instead.`));
+      }
     }
   }
 
-  const app = createDbLensApp({
-    dbPath,
-    defaultDataset,
-    customSqlFile,
-    port
-  });
-
-  const server = http.createServer(app);
-
-  server.listen(port, () => {
-    printBanner({ port, dbPath, defaultDataset, customSqlFile });
-  });
-
-  const shutdown = () => {
-    console.log(pc.yellow('\n  Shutting down TalkToDB...'));
-    server.close(() => {
-      console.log(pc.green('  TalkToDB stopped. Have a productive day! 🚀\n'));
-      process.exit(0);
+  try {
+    const app = await createDbLensApp({
+      dbPath,
+      defaultDataset,
+      customSqlFile,
+      port
     });
-  };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+    const server = http.createServer(app);
+
+    server.listen(port, () => {
+      printBanner({ port, dbPath, defaultDataset, customSqlFile, isPostgres });
+    });
+
+    const shutdown = () => {
+      console.log(pc.yellow('\n  Shutting down TalkToDB...'));
+      server.close(() => {
+        console.log(pc.green('  TalkToDB stopped. Have a productive day! 🚀\n'));
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  } catch (err) {
+    console.error(pc.red(`\n  ❌ Failed to connect to database: ${err.message}`));
+    process.exit(1);
+  }
 }
 
-function printBanner({ port, dbPath, defaultDataset, customSqlFile }) {
+function printBanner({ port, dbPath, defaultDataset, customSqlFile, isPostgres }) {
   console.log(pc.cyan(`
   ████████╗ █████╗ ██╗     ██╗  ██╗████████╗ ██████╗       ██████╗ ██████╗ 
   ╚══██╔══╝██╔══██╗██║     ██║ ██╔╝╚══██╔══╝██╔═══██╗      ██╔══██╗██╔══██╗
@@ -83,7 +96,14 @@ function printBanner({ port, dbPath, defaultDataset, customSqlFile }) {
   console.log(`  ${pc.bold('🖥️  Interactive Web Studio:')}  ${pc.green(`http://localhost:${port}/`)}`);
   
   let sourceLabel = '';
-  if (customSqlFile) {
+  if (isPostgres) {
+    try {
+      const u = new URL(dbPath);
+      sourceLabel = `PostgreSQL Live (${u.pathname.replace('/', '') || 'db'} on ${u.hostname})`;
+    } catch {
+      sourceLabel = 'PostgreSQL Live Remote DB';
+    }
+  } else if (customSqlFile) {
     sourceLabel = `Custom SQL Dump (${path.basename(customSqlFile)})`;
   } else if (dbPath === ':memory:') {
     sourceLabel = `In-Memory (${defaultDataset} demo)`;
@@ -92,6 +112,7 @@ function printBanner({ port, dbPath, defaultDataset, customSqlFile }) {
   }
   
   console.log(`  ${pc.bold('🗄️  Active Database:')}         ${pc.magenta(sourceLabel)}`);
+  console.log(`  ${pc.bold('🛡️  Safety Guard:')}            ${pc.green('100% Read-Only Mode (Database + Application Locked)')}`);
   console.log(`  ${pc.bold('💡 Plain English Prompting:')} Type questions naturally — no SQL required!`);
   console.log(pc.dim('  ----------------------------------------------------------------'));
   console.log(pc.gray('  Press Ctrl+C to stop.\n'));

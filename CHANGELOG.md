@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-15
+
+### Added
+
+- **Live Remote PostgreSQL Database Connectivity**: Direct exploration of cloud PostgreSQL databases (InsForge, Supabase, Neon, AWS RDS, Render) via connection URL.
+- **Triple-Layer Read-Only Safety Protection**:
+  1. *Database Engine Lock*: Session characteristics set to `TRANSACTION READ ONLY` on connection.
+  2. *Application-Level AST Inspection*: Blocks any `DROP`, `DELETE`, `UPDATE`, `INSERT`, `ALTER`, `TRUNCATE`, `GRANT`, `REVOKE`, `VACUUM` queries with HTTP 403.
+  3. *Zero-Write Safety*: Prohibits mock data injection or destructive commands on remote production databases.
+- **Concurrent Schema Introspection**: Parallel table extraction across network pools for fast visual ERD rendering on 20+ table schemas.
+
 ## [1.2.0] - 2026-09-15
 
 ### Added

@@ -34,9 +34,9 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
     assert.equal(studentCount, 6);
   });
 
-  await t.test('2. SchemaExtractor & Relationship Graph', () => {
+  await t.test('2. SchemaExtractor & Relationship Graph', async () => {
     const extractor = new SchemaExtractor(adapter);
-    schema = extractor.extractSchema();
+    schema = await extractor.extractSchema();
 
     assert.equal(schema.tableCount, 5);
     assert.ok(schema.totalRelations >= 4);
@@ -51,9 +51,9 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
     assert.equal(studentDeptRel.fromColumn, 'dept_id');
   });
 
-  await t.test('3. Table Statistics & Quality Profiler', () => {
+  await t.test('3. Table Statistics & Quality Profiler', async () => {
     const statsEngine = new TableStatistics(adapter);
-    const profile = statsEngine.profileTable('students');
+    const profile = await statsEngine.profileTable('students');
 
     assert.equal(profile.tableName, 'students');
     assert.equal(profile.rowCount, 6);
@@ -101,7 +101,7 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
   });
 
   await t.test('6. Live Studio Express Server Endpoints & AI Config', async () => {
-    const app = createDbLensApp({ port: 4350, defaultDataset: 'university' });
+    const app = await createDbLensApp({ port: 4350, defaultDataset: 'university' });
     const server = http.createServer(app);
 
     await new Promise((resolve) => server.listen(4350, resolve));
@@ -166,7 +166,7 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
 
   await t.test('7. Custom PostgreSQL DDL Schema Loading (BuySolar schema test)', async () => {
     const customSchemaPath = path.resolve('C:\\Users\\Martins Udek\\Desktop\\buysolar.ng\\sql\\schema.sql');
-    const customApp = createDbLensApp({ port: 4351, customSqlFile: customSchemaPath });
+    const customApp = await createDbLensApp({ port: 4351, customSqlFile: customSchemaPath });
     const customServer = http.createServer(customApp);
 
     await new Promise((resolve) => customServer.listen(4351, resolve));
@@ -209,6 +209,46 @@ test('TalkToDB — Complete E2E Database Exploration, AI & Natural Language Suit
       assert.ok(queryData.rowCount > 0);
     } finally {
       await new Promise((resolve) => customServer.close(resolve));
+    }
+  });
+
+  await t.test('8. Live PostgreSQL Adapter with 100% Read-Only Session Lock', async () => {
+    const livePgUrl = 'postgresql://postgres:0ec2f4d0a855212d9c6b76071811ecbe@e24icws7.us-east.database.insforge.app:5432/insforge?sslmode=require';
+    const pgApp = await createDbLensApp({ port: 4352, dbPath: livePgUrl });
+    const pgServer = http.createServer(pgApp);
+
+    await new Promise((resolve) => pgServer.listen(4352, resolve));
+
+    try {
+      // 1. Verify schema extraction on live InsForge PostgreSQL
+      const schemaRes = await fetch('http://localhost:4352/api/schema');
+      assert.equal(schemaRes.status, 200);
+      const schema = await schemaRes.json();
+      assert.ok(schema.tableCount >= 20);
+      assert.ok(schema.tables.some(t => t.name === 'products'));
+      assert.ok(schema.tables.some(t => t.name === 'orders'));
+
+      // 2. Verify live SELECT query on products
+      const queryRes = await fetch('http://localhost:4352/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql: 'SELECT name, price, brand FROM products LIMIT 5;' })
+      });
+      assert.equal(queryRes.status, 200);
+      const queryData = await queryRes.json();
+      assert.equal(queryData.success, true);
+      assert.ok(queryData.rows.length > 0);
+
+      // 3. Verify strict read-only protection blocks mutation on live PostgreSQL
+      const mutateAttempt = await fetch('http://localhost:4352/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql: 'DELETE FROM products WHERE id = 1;' })
+      });
+      assert.equal(mutateAttempt.status, 403);
+    } finally {
+      await new Promise((resolve) => pgServer.close(resolve));
+      if (pgApp.adapter) await pgApp.adapter.close();
     }
   });
 
