@@ -1,0 +1,84 @@
+/* db-lens Custom Styles */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom scrollbars */
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ERD Table Node Card */
+.erd-table-card {
+  position: absolute;
+  width: 260px;
+  background-color: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  z-index: 5;
+}
+
+.erd-table-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 15px 30px -5px rgba(16, 185, 129, 0.2);
+  transform: translateY(-2px);
+}
+
+.erd-column-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.4);
+}
+
+.erd-column-row:last-child {
+  border-bottom: none;
+}
+
+/* SVG Connection Lines */
+.erd-relation-line {
+  stroke: #06b6d4;
+  stroke-width: 2;
+  fill: none;
+  stroke-dasharray: 4, 4;
+  opacity: 0.75;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+}
+
+.erd-relation-line:hover {
+  stroke: #10b981;
+  stroke-width: 3;
+  stroke-dasharray: none;
+  opacity: 1;
+}
+
+/* Table Selector Sidebar Item */
+.table-select-item.active {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-left: 3px solid #10b981;
+  color: #34d399;
+}

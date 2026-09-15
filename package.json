@@ -1,0 +1,54 @@
+{
+  "name": "@damisile_ayoola/db-lens",
+  "version": "1.0.0",
+  "description": "Interactive visual database explorer, automatic ERD diagram generator, and plain-English natural language query assistant for students, analysts, and developers.",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "db-lens": "./bin/db-lens.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "public/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "start": "node bin/db-lens.js --demo",
+    "dev": "node bin/db-lens.js --demo",
+    "test": "node --test test/test-dblens.js"
+  },
+  "keywords": [
+    "database",
+    "sql",
+    "sqlite",
+    "erd",
+    "schema",
+    "diagram",
+    "natural-language",
+    "ai",
+    "visualizer",
+    "developer-tools",
+    "education"
+  ],
+  "author": "Ayoola Damisile",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ayoola-tech2024/db-lens.git"
+  },
+  "homepage": "https://github.com/Ayoola-tech2024/db-lens#readme",
+  "bugs": {
+    "url": "https://github.com/Ayoola-tech2024/db-lens/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "express": "^4.21.2",
+    "picocolors": "^1.1.1"
+  }
+}
